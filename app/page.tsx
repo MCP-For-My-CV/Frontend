@@ -56,6 +56,7 @@ export default function MCPFrontend() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
 
   const handleSendMessage = async () => {
     if (!currentMessage.trim()) return;
@@ -70,6 +71,24 @@ export default function MCPFrontend() {
     setMessages((prev) => [...prev, userMessage]);
     setCurrentMessage("");
     setIsLoading(true);
+    setLoadingMessage("🤔 Thinking about your question...");
+
+    // Set progressive loading messages
+    const loadingTimeout1 = setTimeout(() => {
+      setLoadingMessage("🔍 Searching through your CV data...");
+    }, 2000);
+
+    const loadingTimeout2 = setTimeout(() => {
+      setLoadingMessage(
+        "⚙️ The server is working hard to find the best answer..."
+      );
+    }, 5000);
+
+    const loadingTimeout3 = setTimeout(() => {
+      setLoadingMessage(
+        "⏳ Almost there! The backend server is a bit slow but worth the wait..."
+      );
+    }, 8000);
 
     // Connect to MCP server endpoint
     try {
@@ -111,7 +130,12 @@ export default function MCPFrontend() {
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
+      // Clear all loading timeouts
+      clearTimeout(loadingTimeout1);
+      clearTimeout(loadingTimeout2);
+      clearTimeout(loadingTimeout3);
       setIsLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -239,17 +263,29 @@ export default function MCPFrontend() {
                 ))}
                 {isLoading && (
                   <div className="flex justify-start">
-                    <div className="max-w-[80%] rounded-lg border border-border bg-card px-4 py-2 text-sm text-card-foreground">
-                      <div className="flex items-center space-x-2">
-                        <div className="h-2 w-2 animate-bounce rounded-full bg-accent"></div>
-                        <div
-                          className="h-2 w-2 animate-bounce rounded-full bg-accent"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="h-2 w-2 animate-bounce rounded-full bg-accent"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
+                    <div className="max-w-[80%] rounded-lg border border-border bg-card px-4 py-3 text-sm text-card-foreground">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-1">
+                          <div className="h-2 w-2 animate-bounce rounded-full bg-gradient-to-r from-blue-500 to-purple-500"></div>
+                          <div
+                            className="h-2 w-2 animate-bounce rounded-full bg-gradient-to-r from-purple-500 to-pink-500"
+                            style={{ animationDelay: "0.1s" }}
+                          ></div>
+                          <div
+                            className="h-2 w-2 animate-bounce rounded-full bg-gradient-to-r from-pink-500 to-blue-500"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
+                        </div>
+                        <div className="text-muted-foreground">
+                          <p className="animate-pulse font-medium">
+                            {loadingMessage ||
+                              "🤔 Thinking about your question..."}
+                          </p>
+                          <p className="mt-1 text-xs opacity-80">
+                            The server is processing your request, please wait a
+                            moment
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
