@@ -1,103 +1,381 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Send, MessageCircle, Mail, Briefcase } from "lucide-react";
+
+// Client-side timestamp component to avoid hydration issues
+function ClientTimestamp({ timestamp }: { timestamp: Date }) {
+  const [timeString, setTimeString] = useState("");
+
+  useEffect(() => {
+    setTimeString(timestamp.toLocaleTimeString());
+  }, [timestamp]);
+
+  return <span>{timeString}</span>;
+}
+
+interface Message {
+  id: string;
+  content: string;
+  sender: "user" | "assistant";
+  timestamp: Date;
+}
+
+interface EmailForm {
+  recipient: string;
+  subject: string;
+  body: string;
+}
+
+export default function MCPFrontend() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      content:
+        "Hello! I can help you with questions about your CV and experience. Try asking me about your previous roles, skills, or education.",
+      sender: "assistant",
+      timestamp: new Date(),
+    },
+  ]);
+  const [currentMessage, setCurrentMessage] = useState("");
+  const [emailForm, setEmailForm] = useState<EmailForm>({
+    recipient: "",
+    subject: "",
+    body: "",
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+
+  const handleSendMessage = async () => {
+    if (!currentMessage.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: currentMessage,
+      sender: "user",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setCurrentMessage("");
+    setIsLoading(true);
+
+    // Connect to MCP server endpoint
+    try {
+      const response = await fetch("http://localhost:8000/tools/rag", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ question: currentMessage }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content:
+            data.answer ||
+            "I received your message but couldn't process it properly.",
+          sender: "assistant",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("MCP Server connection error:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: `Connection failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }. Make sure your MCP server is running on http://localhost:8000`,
+        sender: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailForm.recipient || !emailForm.subject || !emailForm.body) return;
+
+    setEmailSending(true);
+
+    // TODO: Replace with actual MCP server endpoint
+    try {
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(emailForm),
+      });
+
+      if (response.ok) {
+        setEmailForm({ recipient: "", subject: "", body: "" });
+        // Add success message to chat
+        const successMessage: Message = {
+          id: Date.now().toString(),
+          content: `Email sent successfully to ${emailForm.recipient}!`,
+          sender: "assistant",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, successMessage]);
+      }
+    } catch (error) {
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content:
+          "Please connect your MCP server backend to enable email functionality.",
+        sender: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Briefcase className="h-5 w-5" />
+              </div>
+              <div>
+                <h1 className="font-heading text-xl font-black text-foreground">
+                  MCP Server
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  CV Chat & Email Interface
+                </p>
+              </div>
+            </div>
+            <Badge variant="secondary" className="font-medium">
+              Coding Challenge
+            </Badge>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </header>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid gap-8 lg:grid-cols-2">
+          {/* Chat Interface */}
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-heading">
+                <MessageCircle className="h-5 w-5 text-accent" />
+                CV Chat Assistant
+              </CardTitle>
+              <CardDescription>
+                Ask questions about your resume, experience, and background
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col">
+              {/* Messages */}
+              <div
+                className="flex-1 space-y-4 overflow-y-auto rounded-lg bg-muted/30 p-4"
+                style={{ minHeight: "400px", maxHeight: "500px" }}
+              >
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${
+                      message.sender === "user"
+                        ? "justify-end"
+                        : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
+                        message.sender === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-card-foreground border border-border"
+                      }`}
+                    >
+                      <p className="text-pretty">{message.content}</p>
+                      <p className={`mt-1 text-xs opacity-70`}>
+                        <ClientTimestamp timestamp={message.timestamp} />
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[80%] rounded-lg border border-border bg-card px-4 py-2 text-sm text-card-foreground">
+                      <div className="flex items-center space-x-2">
+                        <div className="h-2 w-2 animate-bounce rounded-full bg-accent"></div>
+                        <div
+                          className="h-2 w-2 animate-bounce rounded-full bg-accent"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="h-2 w-2 animate-bounce rounded-full bg-accent"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Input */}
+              <div className="mt-4 flex space-x-2">
+                <Input
+                  placeholder="Ask about your CV... (e.g., 'What was my role at my last job?')"
+                  value={currentMessage}
+                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={isLoading || !currentMessage.trim()}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Email Form */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-heading">
+                <Mail className="h-5 w-5 text-accent" />
+                Send Email Notification
+              </CardTitle>
+              <CardDescription>
+                Send email notifications through the MCP server
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label
+                  htmlFor="recipient"
+                  className="mb-2 block text-sm font-medium text-foreground"
+                >
+                  Recipient Email
+                </label>
+                <Input
+                  id="recipient"
+                  type="email"
+                  placeholder="recipient@example.com"
+                  value={emailForm.recipient}
+                  onChange={(e) =>
+                    setEmailForm((prev) => ({
+                      ...prev,
+                      recipient: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="subject"
+                  className="mb-2 block text-sm font-medium text-foreground"
+                >
+                  Subject
+                </label>
+                <Input
+                  id="subject"
+                  placeholder="Email subject"
+                  value={emailForm.subject}
+                  onChange={(e) =>
+                    setEmailForm((prev) => ({
+                      ...prev,
+                      subject: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="body"
+                  className="mb-2 block text-sm font-medium text-foreground"
+                >
+                  Message Body
+                </label>
+                <Textarea
+                  id="body"
+                  placeholder="Enter your email message..."
+                  rows={6}
+                  value={emailForm.body}
+                  onChange={(e) =>
+                    setEmailForm((prev) => ({ ...prev, body: e.target.value }))
+                  }
+                />
+              </div>
+
+              <Button
+                onClick={handleSendEmail}
+                disabled={
+                  emailSending ||
+                  !emailForm.recipient ||
+                  !emailForm.subject ||
+                  !emailForm.body
+                }
+                className="w-full"
+              >
+                {emailSending ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send Email
+                  </>
+                )}
+              </Button>
+
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Note:</strong> Connect your MCP server backend to
+                  enable email functionality. The frontend will make requests to{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                    /api/send-email
+                  </code>{" "}
+                  endpoint.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-12 border-t border-border pt-8">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              MCP Server Frontend • Built for Coding Challenge •
+              <a href="#" className="ml-1 text-accent hover:underline">
+                View Documentation
+              </a>
+            </p>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
