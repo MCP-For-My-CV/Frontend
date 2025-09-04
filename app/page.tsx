@@ -73,14 +73,17 @@ export default function MCPFrontend() {
 
     // Connect to MCP server endpoint
     try {
-      const response = await fetch("http://localhost:8000/tools/rag", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ question: currentMessage }),
-      });
+      const response = await fetch(
+        "https://mcp-backend-jfqu.onrender.com/tools/rag",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ question: currentMessage }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -102,7 +105,7 @@ export default function MCPFrontend() {
         id: (Date.now() + 1).toString(),
         content: `Connection failed: ${
           error instanceof Error ? error.message : "Unknown error"
-        }. Make sure your MCP server is running on http://localhost:8000`,
+        }. Make sure your MCP server is running on https://mcp-backend-jfqu.onrender.com`,
         sender: "assistant",
         timestamp: new Date(),
       };
@@ -117,15 +120,25 @@ export default function MCPFrontend() {
 
     setEmailSending(true);
 
-    // TODO: Replace with actual MCP server endpoint
     try {
-      const response = await fetch("/api/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(emailForm),
-      });
+      const response = await fetch(
+        "https://mcp-backend-jfqu.onrender.com/tools/email",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            recipient: emailForm.recipient,
+            subject: emailForm.subject,
+            body: emailForm.body,
+          }),
+        }
+      );
 
       if (response.ok) {
+        const data = await response.json();
         setEmailForm({ recipient: "", subject: "", body: "" });
         // Add success message to chat
         const successMessage: Message = {
@@ -135,12 +148,18 @@ export default function MCPFrontend() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, successMessage]);
+      } else {
+        throw new Error(
+          `Email server responded with status: ${response.status}`
+        );
       }
     } catch (error) {
+      console.error("Email sending error:", error);
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content:
-          "Please connect your MCP server backend to enable email functionality.",
+        content: `Failed to send email: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }. Make sure your email service is running.`,
         sender: "assistant",
         timestamp: new Date(),
       };
